@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
-import string 
-import random
 from faker import Faker
+import random
+import string
 
 # Initialize Faker
 fake = Faker()
@@ -58,24 +58,30 @@ books_df = pd.DataFrame({
     'Price': book_price
 })
 
+# Number of borrowing records
+n_borrowing_records = 1000
+
+# Generate Borrow_Record_ID for borrowing records as 5-digit numbers with trailing zeros
+borrow_record_ids = [str(i + 1).zfill(5) for i in range(n_borrowing_records)]
+
 # Generate borrower data
-borrower_names = [fake.name() for _ in range(100)]  # Generate 100 random borrower names
-borrowers = np.random.choice(borrower_names, n_books)
+borrowers = [fake.name() for _ in range(n_borrowing_records)]
 
 # Generate due dates
-due_dates = pd.date_range(start='2024-03-01', periods=n_books)
+due_dates = pd.date_range(start='2024-03-01', periods=n_borrowing_records)
 
 # Create DataFrame for borrowing records
 borrowing_records_df = pd.DataFrame({
+    'Borrow_Record_ID': borrow_record_ids,
     'Borrower': borrowers,
     'Due_Date': due_dates
 })
 
 # Simulate books that are currently borrowed
-borrowing_records_df['Return_Date'] = borrowing_records_df['Due_Date'] - pd.to_timedelta(np.random.randint(1, 30, n_books), unit='D')
+borrowing_records_df['Book_ID'] = np.random.choice(book_id_data, n_borrowing_records)
 
-# Add book IDs
-borrowing_records_df['Book_ID'] = book_id_data
+# Simulate return dates
+borrowing_records_df['Return_Date'] = borrowing_records_df['Due_Date'] - pd.to_timedelta(np.random.randint(1, 30, n_borrowing_records), unit='D')
 
 # Save to CSV
 books_df.to_csv('library_books.csv', index=False)
