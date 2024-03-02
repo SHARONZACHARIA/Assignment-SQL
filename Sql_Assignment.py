@@ -3,6 +3,7 @@ import pandas as pd
 from faker import Faker
 import random
 import string
+import sqlite3
 
 # Initialize Faker
 fake = Faker()
@@ -114,3 +115,33 @@ member_details_df = pd.DataFrame({
 books_df.to_csv('library_books.csv', index=False)
 borrowing_records_df.to_csv('library_borrowing_records.csv', index=False)
 member_details_df.to_csv('member_details.csv', index=False)
+
+
+# Function to create a SQLite database and import CSV data
+def create_and_import_to_database(csv_file, db_name, table_name):
+    # Connect to the SQLite database (it will be created if not exists)
+    conn = sqlite3.connect(db_name)
+
+    # Create a cursor object to execute SQL queries
+    cursor = conn.cursor()
+
+    # Read CSV file into a Pandas DataFrame
+    df = pd.read_csv(csv_file)
+
+    # Save the DataFrame to the SQLite database as a table
+    df.to_sql(table_name, conn, index=False, if_exists='replace')
+
+    # Commit the changes and close the connection
+    conn.commit()
+    conn.close()
+
+# Specify the CSV files, SQLite database, and table names
+books_csv_file = 'library_books.csv'
+borrowing_records_csv_file = 'library_borrowing_records.csv'
+member_details_csv_file = 'member_details.csv'
+database_name = 'library_database'
+
+# Call the function for each table
+create_and_import_to_database(books_csv_file, database_name, 'books')
+create_and_import_to_database(borrowing_records_csv_file, database_name, 'borrowing_records')
+create_and_import_to_database(member_details_csv_file, database_name, 'member_details')
