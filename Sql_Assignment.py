@@ -96,11 +96,19 @@ borrowing_records_df['Book_ID'] = np.random.choice(book_id_data, n_borrowing_rec
 borrowing_records_df['Return_Date'] = borrowing_records_df['Due_Date'] - pd.to_timedelta(np.random.randint(1, 30, n_borrowing_records), unit='D')
 
 # Generate member details
+# Generate member details
 n_members = 475
 
 member_ids = [generate_member_id() for _ in range(n_members)]
 member_names = [fake.name() for _ in range(n_members)]
 postcodes = [generate_postcode() for _ in range(n_members)]
+
+# Introduce 25% duplicates to postcodes
+num_duplicates = int(n_members * 0.25)
+duplicate_indices = np.random.choice(range(n_members), size=num_duplicates, replace=False)
+for index in duplicate_indices:
+    postcodes[index] = np.random.choice(postcodes)
+
 fines = np.random.choice([0, 5, 10, np.nan], size=n_members, p=[0.6, 0.1, 0.1, 0.2])  # Including missing values
 
 # Create DataFrame for member details
@@ -111,14 +119,15 @@ member_details_df = pd.DataFrame({
     'Fine': fines
 })
 
+
 # Save to CSV
 books_df.to_csv('library_books.csv', index=False)
 borrowing_records_df.to_csv('library_borrowing_records.csv', index=False)
 member_details_df.to_csv('member_details.csv', index=False)
 
 
-# Function to create a SQLite database and import CSV data
-def create_and_import_to_database(csv_file, db_name, table_name):
+# Function to create a SQLite database and import CSV data with constraints
+def create_and_import_to_database_with_constraints(csv_file, db_name, table_name):
     # Connect to the SQLite database (it will be created if not exists)
     conn = sqlite3.connect(db_name)
 
@@ -128,8 +137,45 @@ def create_and_import_to_database(csv_file, db_name, table_name):
     # Read CSV file into a Pandas DataFrame
     df = pd.read_csv(csv_file)
 
-    # Save the DataFrame to the SQLite database as a table
+    # Check if the table already exists
+    cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
+    table_exists = cursor.fetchone()
+
+    # If the table exists, drop it to recreate with constraints
+    if table_exists:
+        cursor.execute(f"DROP TABLE {table_name}")
+
+    # Save the DataFrame to the SQLite database as a table with constraints
     df.to_sql(table_name, conn, index=False, if_exists='replace')
+
+    # Add constraints to the table
+    if table_name == 'books':
+        cursor.execute(f"PRAGMA foreign_keys=ON")  # Enable foreign key support
+        cursor.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ("
+                       "Book_ID TEXT PRIMARY KEY,"
+                       "ISBN TEXT NOT NULL UNIQUE,"
+                       "Author TEXT NOT NULL,"
+                       "Category TEXT CHECK(Category IN ('Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', NULL)),"
+                       "Condition TEXT CHECK(Condition IN ('Excellent', 'Good', 'Fair', 'Poor', NULL)),"
+                       "Publication_Year INTEGER CHECK(Publication_Year BETWEEN 1800 AND 2023),"
+                       "Price REAL CHECK(Price >= 10 AND Price <= 100)"
+                       ")")
+    elif table_name == 'borrowing_records':
+        cursor.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ("
+                       "Borrow_Record_ID INTEGER PRIMARY KEY,"
+                       "Borrower TEXT NOT NULL,"
+                       "Due_Date DATE NOT NULL,"
+                       "Return_Date DATE,"
+                       "Book_ID TEXT NOT NULL,"
+                       "FOREIGN KEY(Book_ID) REFERENCES books(Book_ID) ON DELETE CASCADE"
+                       ")")
+    elif table_name == 'member_details':
+        cursor.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ("
+                       "Member_ID TEXT PRIMARY KEY,"
+                       "Name TEXT NOT NULL,"
+                       "Postcode TEXT NOT NULL,"
+                       "Fine REAL CHECK(Fine >= 0 AND Fine <= 10 OR Fine IS NULL)"
+                       ")")
 
     # Commit the changes and close the connection
     conn.commit()
@@ -141,7 +187,8 @@ borrowing_records_csv_file = 'library_borrowing_records.csv'
 member_details_csv_file = 'member_details.csv'
 database_name = 'library_database'
 
-# Call the function for each table
-create_and_import_to_database(books_csv_file, database_name, 'books')
-create_and_import_to_database(borrowing_records_csv_file, database_name, 'borrowing_records')
-create_and_import_to_database(member_details_csv_file, database_name, 'member_details')
+# Call the function for each table with constraints
+create_and_import_to_database_with_constraints(books_csv_file, database_name, 'books')
+create_and_import_to_database_with_constraints(borrowing_records_csv_file, database_name, 'borrowing_records')
+create_and_import_to_database_with_constraints(member_details_csv_file, database_name, 'member_details')
+
